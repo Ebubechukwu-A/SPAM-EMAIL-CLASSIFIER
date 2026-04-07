@@ -1,10 +1,3 @@
-"""
-Naive Bayes Spam Email Classifier
-SOFE 3720 - Intro to AI Final Project
-
-Implements Naive Bayes from scratch (no sklearn).
-Uses Laplace smoothing to handle unseen words.
-"""
 
 import csv
 import math
@@ -12,12 +5,11 @@ import re
 from collections import defaultdict
 
 
-# ── In-memory training dataset (20 labelled emails) ──────────────────────────
 
 
 
 
-# ── Text preprocessing ────────────────────────────────────────────────────────
+# ──Process the text using .lower, re.findall()
 
 def tokenize(text: str) -> list[str]:
     """Lowercase and split text into word tokens, stripping punctuation."""
@@ -26,18 +18,10 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
-# ── Naive Bayes Classifier ────────────────────────────────────────────────────
+# ── Naive Bayes Classifier 
 
 class NaiveBayesClassifier:
-    """
-    Multinomial Naive Bayes classifier built from scratch.
-
-    Bayes theorem applied:
-        P(class | words) ∝ P(class) * ∏ P(word | class)
-
-    Log-space arithmetic is used to avoid floating-point underflow.
-    Laplace (add-1) smoothing handles zero-probability words.
-    """
+  
 
     def __init__(self):
         self.class_log_prior: dict[str, float] = {}
