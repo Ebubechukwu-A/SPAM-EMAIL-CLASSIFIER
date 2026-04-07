@@ -35,7 +35,7 @@ class NaiveBayesClassifier:
 
     # ── Training ──────────────────────────────────────────────────────────────
 
-    def train(self, dataset: list[tuple[str, str]]) -> None:
+    def train(self, dataset: list[tuple[str, str]]) -> None:   #Setting up the formattinng for the csv's
         """
         Train on a list of (text, label) pairs.
 
@@ -45,13 +45,13 @@ class NaiveBayesClassifier:
           3. Apply Laplace smoothing    →  likelihood
           4. Convert to log space
         """
-        word_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        doc_counts: dict[str, int] = defaultdict(int)
+        word_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))   # how many emails per class
+        doc_counts: dict[str, int] = defaultdict(int)     #how many times each word appears per class
         total_docs = len(dataset)
 
-        for text, label in dataset:
+        for text, label in dataset:   #Looping through emails
             doc_counts[label] += 1
-            for token in tokenize(text):
+            for token in tokenize(text):      #Break email into words
                 word_counts[label][token] += 1
                 self.vocab.add(token)
 
