@@ -9,7 +9,7 @@ from collections import defaultdict
 
 
 
-# ──Process the text using .lower, re.findall()
+# Process the text using .lower, re.findall()
 
 def tokenize(text: str) -> list[str]:
     """Lowercase and split text into word tokens, stripping punctuation."""
@@ -18,7 +18,7 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
-# ── Naive Bayes Classifier 
+#  Naive Bayes Classifier 
 
 class NaiveBayesClassifier:
   
@@ -33,41 +33,44 @@ class NaiveBayesClassifier:
         self._class_total_words: dict[str, int] = {}
         self._class_doc_counts: dict[str, int] = {}
 
-    # ── Training ──────────────────────────────────────────────────────────────
-
+    #  Training 
     def train(self, dataset: list[tuple[str, str]]) -> None:   #Setting up the formattinng for the csv's
-        """
-        Train on a list of (text, label) pairs.
 
-        Steps:
-          1. Count documents per class  →  prior probability
-          2. Count word occurrences per class
-          3. Apply Laplace smoothing    →  likelihood
-          4. Convert to log space
-        """
+       
+
         word_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))   # how many emails per class
         doc_counts: dict[str, int] = defaultdict(int)     #how many times each word appears per class
         total_docs = len(dataset)
 
-        for text, label in dataset:   #Looping through emails
+        for text, label in dataset:   #Looping through emails, I've now seen 450 spam emails and 550 ham emails
             doc_counts[label] += 1
-            for token in tokenize(text):      #Break email into words
+            for token in tokenize(text):      #Break email into words, The word 'free' has appeared 90 times in spam, 2 times in ham
+
                 word_counts[label][token] += 1
                 self.vocab.add(token)
 
         self.classes = list(doc_counts.keys())
         vocab_size = len(self.vocab)
 
+
+
+#------------------------------------------------------
+
+
+
+
+        # CONVERTING RAW COUNTS INTO PROBABBILTIY (caclucations)
         for cls in self.classes:
             # Log prior:  log P(class)
             self.class_log_prior[cls] = math.log(doc_counts[cls] / total_docs)
 
             total_words = sum(word_counts[cls].values())
-            self._class_word_counts[cls] = dict(word_counts[cls])
+            self._class_word_counts[cls] = dict(word_counts[cls])   #Comparing word vs amount of total words to get the score
             self._class_total_words[cls] = total_words
             self._class_doc_counts[cls] = doc_counts[cls]
 
             # Log likelihood with Laplace smoothing:
+
             #   log P(word | class) = log( (count(word,class) + 1) /
             #                              (total_words_in_class + vocab_size) )
             self.word_log_likelihood[cls] = {}
@@ -81,33 +84,31 @@ class NaiveBayesClassifier:
             # Store the smoothed unknown-word likelihood for unseen tokens
             self.word_log_likelihood[cls]["<UNK>"] = math.log(1 / denominator)
 
-    # ── Prediction ────────────────────────────────────────────────────────────
+
+
+    # Prediction func 
+    # Actually uses the porbablilties from "for cls in self.classses"
 
     def predict(self, text: str) -> dict:
-        """
-        Classify a single email string.
 
-        Returns a dict with:
-          - prediction  : winning class label
-          - scores      : raw log-posterior per class
-          - probabilities: normalised probability per class (softmax-style)
-          - tokens_used : which tokens contributed to the decision
-        """
         tokens = tokenize(text)
+
+
+        #Actual naive bayes forumals
 
         log_posteriors: dict[str, float] = {}
         for cls in self.classes:
-            score = self.class_log_prior[cls]
-            for token in tokens:
+            score = self.class_log_prior[cls]    #Prior probabiloity formula (comparing word vs amount of normal emails) aka log P(class)
+            for token in tokens:    
                 if token in self.word_log_likelihood[cls]:
-                    score += self.word_log_likelihood[cls][token]
+                    score += self.word_log_likelihood[cls][token]  # + log P(word | class) , the "score" of the word we calcualted from for "cls in self.classes"
                 else:
-                    # Unseen word — use smoothed unknown likelihood
+                    # Unseen word, use smoothed unknown likelihood (add 1 to words that AI hasnt seen before)
                     score += self.word_log_likelihood[cls]["<UNK>"]
-            log_posteriors[cls] = score
+            log_posteriors[cls] = score  #final score
 
-        # Convert log-posteriors to normalised probabilities
-        #   exp(score) / sum(exp(score))  — computed stably via log-sum-exp
+
+        # Convert log-posteriors to percentages for humans to read
         max_score = max(log_posteriors.values())
         exp_scores = {cls: math.exp(s - max_score) for cls, s in log_posteriors.items()}
         total = sum(exp_scores.values())
@@ -122,14 +123,17 @@ class NaiveBayesClassifier:
             "tokens_used": tokens,
         }
 
-    # ── Evaluation ────────────────────────────────────────────────────────────
+
+
+
+#------------------------------------------------------
+
+
+    # Confusion matrix, a scoreboard of right and wrong answers
+
 
     def evaluate(self, dataset: list[tuple[str, str]]) -> dict:
-        """
-        Run classifier over a labelled dataset and return metrics.
-
-        Returns accuracy, precision, recall, F1, and a full confusion matrix.
-        """
+   
         labels = self.classes
         # confusion_matrix[actual][predicted]
         cm: dict[str, dict[str, int]] = {
@@ -140,7 +144,6 @@ class NaiveBayesClassifier:
             predicted = self.predict(text)["prediction"]
             cm[actual][predicted] += 1
 
-        # Derive per-class metrics
         metrics_per_class = {}
         for cls in labels:
             tp = cm[cls][cls]
@@ -168,10 +171,8 @@ class NaiveBayesClassifier:
             "confusion_matrix": cm,
         }
 
-    # ── Introspection (useful for report / demo) ──────────────────────────────
 
     def top_words(self, cls: str, n: int = 10) -> list[tuple[str, int]]:
-        """Return the n most frequent words for a given class."""
         counts = self._class_word_counts.get(cls, {})
         return sorted(counts.items(), key=lambda x: x[1], reverse=True)[:n]
 
@@ -179,7 +180,6 @@ class NaiveBayesClassifier:
         return len(self.vocab)
 
 
-# ── API / entry-point helpers ─────────────────────────────────────────────────
 def load_dataset_from_csv(filename: str) -> list[tuple[str, str]]:
     dataset = []
     with open(filename, "r", encoding="utf-8") as file:
@@ -190,10 +190,13 @@ def load_dataset_from_csv(filename: str) -> list[tuple[str, str]]:
             dataset.append((text, label))
     return dataset
 
-# Module-level singleton so the model trains once on import
+
+
+
+#------------------------------------------------------
 _classifier = NaiveBayesClassifier()
-TRAINING_DATA = load_dataset_from_csv("train_emails.csv")  # CHANGED: load training set instead of the full emails.csv
-TEST_DATA = load_dataset_from_csv("test_emails.csv")  # CHANGED: load separate test set for evaluation
+TRAINING_DATA = load_dataset_from_csv("train_emails.csv")  # loading data
+TEST_DATA = load_dataset_from_csv("test_emails.csv")  # loading data
 _classifier.train(TRAINING_DATA)
 
 def classify_email(text: str) -> dict:
@@ -203,23 +206,27 @@ def classify_email(text: str) -> dict:
 
 def get_evaluation_report() -> dict:
     """Evaluate classifier on training data (use a held-out set in production)."""
-    return _classifier.evaluate(TEST_DATA)  # CHANGED: evaluate on unseen test data instead of training data
+    return _classifier.evaluate(TEST_DATA)  # evaluating on unseen test data csv
 
 
+
+
+#------------------------------------------------------
 def get_model_info() -> dict:
-    """Return summary info about the trained model."""
+    #Return summary info about the trained model
     return {
         "vocabulary_size": _classifier.vocab_size(),
         "classes": _classifier.classes,
         "training_samples": len(TRAINING_DATA),
-        "test_samples": len(TEST_DATA),  # CHANGED: include test sample count in model info
+        "test_samples": len(TEST_DATA),  
         "class_distribution": _classifier._class_doc_counts,
         "top_spam_words": _classifier.top_words("spam"),
         "top_ham_words":  _classifier.top_words("ham"),
     }
 
+#------------------------------------------------------
 
-# ── Quick self-test ───────────────────────────────────────────────────────────
+#Self-test based on test data csv
 
 if __name__ == "__main__":
     test_emails = [
@@ -259,6 +266,6 @@ if __name__ == "__main__":
     info = get_model_info()
     print(f"Vocabulary size : {info['vocabulary_size']}")
     print(f"Training samples: {info['training_samples']}")
-    print(f"Test samples    : {info['test_samples']}")  # CHANGED: print test sample count too
+    print(f"Test samples    : {info['test_samples']}")  
     print(f"Top spam words  : {[w for w, _ in info['top_spam_words'][:5]]}")
     print(f"Top ham words   : {[w for w, _ in info['top_ham_words'][:5]]}")
